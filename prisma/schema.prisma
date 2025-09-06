@@ -1,0 +1,54 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id          Int                  @id @default(autoincrement())
+  email       String               @unique
+  name        String?
+  preferences TimeZonePreference[]
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String
+  country   String
+  timezone  String   // e.g. "America/New_York"
+  offset    Int      // UTC offset in minutes
+  users     TimeZonePreference[]
+}
+
+model TimeZonePreference {
+  id     Int   @id @default(autoincrement())
+  userId Int
+  cityId Int
+  user   User @relation(fields: [userId], references: [id])
+  city   City @relation(fields: [cityId], references: [id])
+}
+
+model ContactSubmission {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("pending") // pending, read, responded
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Meeting {
+  id        String   @id @default(cuid())
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  cities    String   // JSON array of city names
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
