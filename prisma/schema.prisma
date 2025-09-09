@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String               @id @default(cuid())
+  name          String?
+  email         String               @unique
+  emailVerified DateTime?
+  image         String?
+  role          String               @default("user")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  accounts      Account[]
+  activityLogs  ActivityLog[]
+  sessions      Session[]
+  ownedTeams    Team[]               @relation("TeamOwner")
+  teams         TeamMember[]
+  preferences   TimeZonePreference[]
+  createdInvites TeamInvite[]        @relation("InviteCreator")
+  acceptedInvites TeamInvite[]       @relation("InviteAccepted")
+  declinedInvites TeamInvite[]       @relation("InviteDeclined")
+}
+
+model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     TeamMember[]
+  invites     TeamInvite[]
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+}
+
+model TeamInvite {
+  id          String   @id @default(cuid())
+  teamId      String
+  token       String   @unique
+  createdBy   String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime?
+  acceptedBy  String?
+  acceptedAt  DateTime?
+  declinedBy  String?
+  declinedAt  DateTime?
+  status      InviteStatus @default(PENDING)
+  
+  team        Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  creator     User     @relation("InviteCreator", fields: [createdBy], references: [id])
+  acceptedUser User?   @relation("InviteAccepted", fields: [acceptedBy], references: [id])
+  declinedUser User?   @relation("InviteDeclined", fields: [declinedBy], references: [id])
+
+  @@index([token])
+  @@index([teamId])
+  @@index([createdBy])
+  @@index([status])
+}
+
+model City {
+  id       Int                  @id @default(autoincrement())
+  name     String
+  country  String
+  timezone String
+  offset   Int
+  users    TimeZonePreference[]
+}
+
+model TimeZonePreference {
+  id        String   @id @default(cuid())
+  userId    String
+  cityId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cityId])
+}
+
+model ContactSubmission {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  email     String
+  subject   String
+  message   String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Meeting {
+  id        String   @id @default(cuid())
+  date      DateTime
+  startTime DateTime
+  endTime   DateTime
+  cities    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  description String
+  metadata    String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+  @@index([action])
+}
+
+model SystemSettings {
+  id                       String   @id @default(cuid())
+  defaultTimezone          String   @default("UTC")
+  enableNotifications      Boolean  @default(true)
+  enableEmailNotifications Boolean  @default(true)
+  enableRealTimeUpdates    Boolean  @default(true)
+  maxCitiesPerUser         Int      @default(10)
+  meetingDurationMinutes   Int      @default(60)
+  enableAIAssistant        Boolean  @default(true)
+  enableAnalytics          Boolean  @default(true)
+  maintenanceMode          Boolean  @default(false)
+  customBranding           String?
+  updatedAt                DateTime @updatedAt
+  createdAt                DateTime @default(now())
+
+  @@map("system_settings")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  priority  String   @default("medium")
+  metadata  String?
+  userId    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([isRead])
+  @@index([type])
+  @@index([userId])
+}
+
+enum TeamRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
